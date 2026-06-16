@@ -12,7 +12,7 @@ const fs = require('fs');
 const path = require('path');
 
 // Load env variables
-dotenv.config();
+dotenv.config({ path: path.join(__dirname, '.env') });
 
 // Connect to database
 const connectDB = require('./config/db');
