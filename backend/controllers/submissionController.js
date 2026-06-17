@@ -1,6 +1,6 @@
 const Submission = require('../models/Submission');
 const AuditLog = require('../models/AuditLog');
-const { uploadStream } = require('../config/cloudinary');
+const { uploadStream, cloudinary } = require('../config/cloudinary');
 const fs = require('fs');
 const path = require('path');
 
@@ -557,6 +557,44 @@ const updateStudentPhoto = async (req, res, next) => {
 };
 
 /**
+ * Helper to delete a student photo from Cloudinary or local storage
+ */
+const deleteStudentPhoto = async (photoUrl) => {
+  if (!photoUrl) return;
+
+  if (photoUrl.includes('res.cloudinary.com')) {
+    // Cloudinary deletion
+    try {
+      const parts = photoUrl.split('/upload/');
+      if (parts.length >= 2) {
+        const pathAfterUpload = parts[1].replace(/^v\d+\//, '');
+        const lastDotIndex = pathAfterUpload.lastIndexOf('.');
+        const publicId = lastDotIndex === -1 ? pathAfterUpload : pathAfterUpload.substring(0, lastDotIndex);
+        
+        await cloudinary.uploader.destroy(publicId);
+        console.log(`Successfully deleted image from Cloudinary: ${publicId}`);
+      }
+    } catch (err) {
+      console.error('Failed to delete image from Cloudinary:', err);
+    }
+  } else if (photoUrl.includes('/uploads/')) {
+    // Local fallback deletion
+    try {
+      const filename = photoUrl.split('/uploads/')[1];
+      if (filename) {
+        const filepath = path.join(__dirname, '..', 'uploads', filename);
+        if (fs.existsSync(filepath)) {
+          fs.unlinkSync(filepath);
+          console.log(`Successfully deleted local image file: ${filepath}`);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to delete local image file:', err);
+    }
+  }
+};
+
+/**
  * @desc    Delete a submission
  * @route   DELETE /api/submissions/:id
  * @access  Private (Admin)
@@ -569,6 +607,15 @@ const deleteSubmission = async (req, res, next) => {
     }
 
     await Submission.findByIdAndDelete(req.params.id);
+
+    // Clean up student photos from storage
+    if (submission.students && submission.students.length > 0) {
+      for (const student of submission.students) {
+        if (student.photoUrl) {
+          await deleteStudentPhoto(student.photoUrl);
+        }
+      }
+    }
 
     // Log to Audit Log
     await AuditLog.create({

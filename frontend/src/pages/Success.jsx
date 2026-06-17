@@ -73,30 +73,8 @@ const Success = () => {
             </Box>
 
             {/* Frontdesk Wait Info Alert/Message */}
-            <Paper
-              variant="outlined"
-              sx={{
-                p: 2.5,
-                mb: 3,
-                bgcolor: '#EFF6FF',
-                borderColor: '#BFDBFE',
-                borderRadius: 3,
-                textAlign: 'left'
-              }}
-            >
-              <Typography variant="body2" sx={{ color: '#1E40AF', fontWeight: 700, mb: 0.5 }}>
-                Please wait at the front desk
-              </Typography>
-              <Typography variant="caption" sx={{ color: '#1E40AF', display: 'block', lineHeight: 1.4 }}>
-                Your pass request has been submitted. Please wait at the front desk for your gate pass to be printed and issued.
-              </Typography>
-            </Paper>
-
-            <Divider sx={{ my: 3 }} />
-
-            {/* QR Code Container */}
-            <Typography variant="body2" color="textSecondary" sx={{ mb: 2, fontWeight: 500 }}>
-              Show this QR code to the Security Front Desk staff upon arrival for immediate check-in.
+            <Typography variant="body2" color="textSecondary" sx={{ mb: 3, fontWeight: 500, px: 1, lineHeight: 1.5 }}>
+              Your pass request has been submitted. Please wait at the front desk for your gate pass to be printed and issued. Please inform the front desk after registering.
             </Typography>
 
             <Paper
