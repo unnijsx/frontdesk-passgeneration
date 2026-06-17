@@ -246,7 +246,7 @@ const updateSubmissionStatus = async (req, res, next) => {
   const { status, validFrom, validTo } = req.body; // 'approved' | 'rejected'
   const submissionId = req.params.id;
 
-  if (!['approved', 'rejected', 'archived'].includes(status)) {
+  if (!['pending', 'approved', 'rejected', 'archived'].includes(status)) {
     return res.status(400).json({ success: false, message: 'Invalid status' });
   }
 
