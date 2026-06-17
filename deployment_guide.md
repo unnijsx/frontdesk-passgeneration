@@ -1,6 +1,6 @@
-# TechnoPass Deployment Guide (Cloud Setup)
+# SrishtiPass Deployment Guide (Cloud Setup)
 
-This guide outlines how to deploy the **TechnoPass** application to the cloud, allowing interns/students to scan the registration QR code and submit details using their own mobile data (4G/5G) from anywhere.
+This guide outlines how to deploy the **SrishtiPass** application to the cloud, allowing interns/students to scan the registration QR code and submit details using their own mobile data (4G/5G) from anywhere.
 
 ---
 
@@ -21,7 +21,7 @@ Initialize git in the root workspace folder (`Frontdesk Automation Pdf creator`)
 ```bash
 git init
 git add .
-git commit -m "Initial commit of TechnoPass MERN application"
+git commit -m "Initial commit of SrishtiPass MERN application"
 # Create a repository on GitHub and link it
 git remote add origin <your-github-repo-url>
 git branch -M main
@@ -37,7 +37,7 @@ git push -u origin main
 - Go to **Database Access** and create a user with read/write access.
 - Go to **Network Access** and select **Allow Access from Anywhere (0.0.0.0/0)** (Render servers need dynamic IP access).
 - Copy your connection string. It should look like:
-  `mongodb+srv://<username>:<password>@cluster0.xxxx.mongodb.net/technopass?retryWrites=true&w=majority`
+  `mongodb+srv://<username>:<password>@cluster0.xxxx.mongodb.net/srishtipass?retryWrites=true&w=majority`
 
 ### 2. Cloudinary
 - Log in to your Cloudinary Dashboard.
@@ -50,7 +50,7 @@ git push -u origin main
 1. Log in to [Render](https://render.com) and click **New** -> **Web Service**.
 2. Connect your GitHub repository.
 3. Set the following details:
-   - **Name:** `technopass-backend`
+   - **Name:** `srishtipass-backend`
    - **Root Directory:** `backend`
    - **Runtime:** `Node`
    - **Build Command:** `npm install`
@@ -65,7 +65,7 @@ git push -u origin main
    - `CLOUDINARY_API_KEY`: `<your-cloudinary-api-key>`
    - `CLOUDINARY_API_SECRET`: `<your-cloudinary-api-secret>`
    - `CORS_ORIGIN`: `<your-vercel-frontend-url-once-created>` (Update this in Render settings after Step 4)
-5. Click **Deploy Web Service**. Once deployed, copy your Render app URL (e.g. `https://technopass-backend.onrender.com`).
+5. Click **Deploy Web Service**. Once deployed, copy your Render app URL (e.g. `https://srishtipass-backend.onrender.com`).
 
 ---
 
@@ -78,12 +78,12 @@ git push -u origin main
    - **Root Directory:** `frontend`
 4. Expand **Environment Variables** and add:
    - `VITE_API_URL`: `<your-render-backend-url-from-step-3>/api`
-     *(Example: `https://technopass-backend.onrender.com/api`)*
+     *(Example: `https://srishtipass-backend.onrender.com/api`)*
 5. Click **Deploy**.
-6. Once the build finishes, copy your live Vercel URL (e.g. `https://technopass.vercel.app`).
+6. Once the build finishes, copy your live Vercel URL (e.g. `https://srishtipass.vercel.app`).
 
 > [!IMPORTANT]
-> **Go back to your Render Dashboard** for the backend service, navigate to **Environment Variables**, and update `CORS_ORIGIN` with your Vercel URL (e.g., `https://technopass.vercel.app`). Render will redeploy automatically with CORS security configured to permit access exclusively from your Vercel frontend.
+> **Go back to your Render Dashboard** for the backend service, navigate to **Environment Variables**, and update `CORS_ORIGIN` with your Vercel URL (e.g., `https://srishtipass.vercel.app`). Render will redeploy automatically with CORS security configured to permit access exclusively from your Vercel frontend.
 
 ---
 

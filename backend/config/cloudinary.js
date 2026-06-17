@@ -15,7 +15,7 @@ cloudinary.config({
  * @param {string} folder - Destination folder on Cloudinary
  * @returns {Promise<object>} - Cloudinary upload result
  */
-const uploadStream = (buffer, folder = 'technopass') => {
+const uploadStream = (buffer, folder = 'srishtipass') => {
   return new Promise((resolve, reject) => {
     const stream = cloudinary.uploader.upload_stream(
       {

@@ -97,6 +97,7 @@ const Dashboard = () => {
 
   // QR dialog
   const [qrDialogOpen, setQrDialogOpen] = useState(false);
+  const [isPrintingQr, setIsPrintingQr] = useState(false);
 
   // Selection states (for bulk actions)
   const [selectedStudentIds, setSelectedStudentIds] = useState([]);
@@ -518,6 +519,11 @@ const Dashboard = () => {
     setPendingPrint(null);
   };
 
+  const handlePrintQr = () => {
+    setQrDialogOpen(false);
+    setIsPrintingQr(true);
+  };
+
   // Bulk reject handler
   const handleBulkReject = () => {
     if (window.confirm(`Are you sure you want to reject ${selectedStudentIds.length} selected students?`)) {
@@ -572,7 +578,7 @@ const Dashboard = () => {
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement('a');
     link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `technopass_export_${new Date().toISOString().split('T')[0]}.csv`);
+    link.setAttribute('download', `srishtipass_export_${new Date().toISOString().split('T')[0]}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -583,7 +589,7 @@ const Dashboard = () => {
 
   // Perform browser native print dialogue when printable state updates
   useEffect(() => {
-    if (passesToPrint.length > 0) {
+    if (passesToPrint.length > 0 || isPrintingQr) {
       // Wait for every <img> in the print container to fully load before printing
       const waitForImages = () => new Promise((resolve) => {
         // Small initial delay to let React render the portal into the DOM
@@ -613,9 +619,10 @@ const Dashboard = () => {
       waitForImages().then(() => {
         window.print();
         setPassesToPrint([]);
+        setIsPrintingQr(false);
       });
     }
-  }, [passesToPrint]);
+  }, [passesToPrint, isPrintingQr]);
 
   // Date format utility
   const formatDateString = (dateVal) => {
@@ -1244,7 +1251,7 @@ const Dashboard = () => {
             <Box
               component="img"
               src={`https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(window.location.origin + '/register')}&color=0f172a`}
-              alt="TechnoPass Portal Registration QR"
+              alt="SrishtiPass Portal Registration QR"
               sx={{ width: 220, height: 220 }}
             />
           </Paper>
@@ -1252,9 +1259,12 @@ const Dashboard = () => {
             {window.location.origin}/register
           </Typography>
         </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setQrDialogOpen(false)} fullWidth variant="contained" color="primary">
+        <DialogActions sx={{ px: 3, pb: 3, justifyContent: 'space-between', gap: 2 }}>
+          <Button onClick={() => setQrDialogOpen(false)} variant="outlined" color="inherit" sx={{ flex: 1, borderColor: '#CBD5E1', color: '#64748B', '&:hover': { borderColor: '#94A3B8', bgcolor: '#F8FAFC' } }}>
             Close
+          </Button>
+          <Button onClick={handlePrintQr} variant="contained" color="primary" startIcon={<PrintIcon />} sx={{ flex: 1 }}>
+            Print QR
           </Button>
         </DialogActions>
       </Dialog>
@@ -1274,27 +1284,10 @@ const Dashboard = () => {
       />
 
       {/* HIDDEN PRINT CONTAINER (Printed on window.print()) */}
-      {passesToPrint.length > 0 && createPortal(
+      {(passesToPrint.length > 0 || isPrintingQr) && createPortal(
         <div id="printable-pass-container">
-          {passesToPrint.map((pass, index) => {
-            const formatPrintDate = (dateVal) => {
-              if (!dateVal) return '';
-              return new Date(dateVal).toLocaleDateString('en-GB', {
-                day: 'numeric',
-                month: 'long',
-                year: 'numeric'
-              });
-            };
-
-            const formattedDate = formatPrintDate(pass.validFrom) || formatPrintDate(new Date());
-            const validFromStr = formatPrintDate(pass.validFrom);
-          const validToStr = formatPrintDate(pass.validTo);
-          const validityText = validFromStr === validToStr 
-            ? validFromStr 
-            : `from ${validFromStr} to ${validToStr}`;
-
-          return (
-            <div key={index} className="print-page" style={{
+          {isPrintingQr ? (
+            <div className="print-page" style={{
               width: '210mm', // A4 Dimensions
               height: '297mm',
               padding: '0',
@@ -1321,59 +1314,34 @@ const Dashboard = () => {
                 padding: '0 20mm',
                 display: 'flex',
                 flexDirection: 'column',
-                boxSizing: 'border-box'
+                alignItems: 'center',
+                justifyContent: 'center',
+                boxSizing: 'border-box',
+                textAlign: 'center'
               }}>
-                <div style={{ textAlign: 'left', marginBottom: '8mm', fontSize: '13pt', lineHeight: '1.4' }}>
-                  To<br />
-                  The Security Officer<br />
-                  Technopark
-                </div>
-
-                <div style={{ textAlign: 'right', marginBottom: '8mm', fontSize: '12pt' }}>
-                  {formattedDate}
-                </div>
-
-                <div style={{ marginBottom: '6mm' }}>
-                  Sir/ Ma'am
-                </div>
-
-                <div style={{ marginBottom: '10mm', textAlign: 'justify' }}>
-                  Please permit our trainee <span style={{ textTransform: 'uppercase' }}>{pass.name}</span> to enter Technopark campus {validityText}.
-                </div>
-
-                {/* Passport Photo */}
+                <h1 style={{ fontSize: '26pt', fontWeight: 'bold', margin: '0 0 12px 0', color: '#0f172a' }}>
+                  Student Registration QR
+                </h1>
+                <p style={{ fontSize: '14pt', color: '#475569', margin: '0 auto 35px auto', maxWidth: '500px', lineHeight: '1.6' }}>
+                  Print this QR Code and place it at the reception counter. Students can scan this with their smartphones to register instantly.
+                </p>
                 <div style={{
-                  width: '35mm',
-                  height: '45mm',
-                  border: '1px solid #000000',
-                  padding: '1px',
+                  padding: '20px',
                   backgroundColor: '#FFFFFF',
-                  marginBottom: '10mm'
+                  borderRadius: '16px',
+                  border: '1px solid #e2e8f0',
+                  boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)',
+                  display: 'inline-flex',
+                  marginBottom: '25px'
                 }}>
-                  <img src={getPhotoUrl(pass.photoUrl)} alt="Trainee" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  <img
+                    src={`https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(window.location.origin + '/register')}&color=0f172a`}
+                    alt="SrishtiPass Portal Registration QR"
+                    style={{ width: '160mm', height: '160mm', maxWidth: '240px', maxHeight: '240px', display: 'block' }}
+                  />
                 </div>
-
-                {/* Note */}
-                <div style={{ fontSize: '10.5pt', color: '#333333', marginBottom: '10mm', lineHeight: '1.5' }}>
-                  Note: For issuing new gate passes you must submit this back to the admin. In case you lose your gate pass there will be a fine of Rs 1000.
-                </div>
-
-                {/* Bottom Stamps & HR section */}
-                <div style={{ marginTop: '8mm' }}>
-                  {/* Signatures & Stamps */}
-                  <div style={{ position: 'relative', height: '25mm', marginBottom: '6mm' }}>
-                    {/* Signature (stamp_large) - Sign first */}
-                    <img src="/images/stamp_large.png" alt="Srishti Seal" style={{ width: '20.73mm', height: '17.47mm', position: 'absolute', left: '0', bottom: '0', zIndex: 1 }} />
-                    {/* Seal (stamp_small) - Seal over signature */}
-                    <img src="/images/stamp_small.png" alt="Srishti Stamp" style={{ width: '25.59mm', height: '24.85mm', position: 'absolute', left: '18mm', bottom: '0', zIndex: 2 }} />
-                  </div>
-
-                  {/* HR Contact info */}
-                  <div style={{ fontSize: '12pt', lineHeight: '1.3' }}>Aarthi A G</div>
-                  <div style={{ fontSize: '10pt', color: '#333333', lineHeight: '1.4' }}>
-                    Contact No: +91-9072442200<br />
-                    HR Team – Srishti Innovative
-                  </div>
+                <div style={{ fontSize: '16pt', fontWeight: 'bold', color: '#2563EB', marginTop: '15px' }}>
+                  {window.location.origin}/register
                 </div>
               </div>
 
@@ -1382,8 +1350,116 @@ const Dashboard = () => {
                 <img src="/images/footer_banner.jpg" alt="Footer Banner" style={{ width: '100%', display: 'block' }} />
               </div>
             </div>
-            );
-          })}
+          ) : (
+            passesToPrint.map((pass, index) => {
+              const formatPrintDate = (dateVal) => {
+                if (!dateVal) return '';
+                return new Date(dateVal).toLocaleDateString('en-GB', {
+                  day: 'numeric',
+                  month: 'long',
+                  year: 'numeric'
+                });
+              };
+
+              const formattedDate = formatPrintDate(pass.validFrom) || formatPrintDate(new Date());
+              const validFromStr = formatPrintDate(pass.validFrom);
+              const validToStr = formatPrintDate(pass.validTo);
+              const validityText = validFromStr === validToStr 
+                ? validFromStr 
+                : `from ${validFromStr} to ${validToStr}`;
+
+              return (
+                <div key={index} className="print-page" style={{
+                  width: '210mm', // A4 Dimensions
+                  height: '297mm',
+                  padding: '0',
+                  margin: 'auto',
+                  boxSizing: 'border-box',
+                  position: 'relative',
+                  backgroundColor: '#FFFFFF',
+                  color: '#000000',
+                  fontFamily: 'Arial, Helvetica, sans-serif',
+                  border: '1px solid #CCCCCC'
+                }}>
+                  {/* Header Banner - Absolute Top */}
+                  <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: 'auto' }}>
+                    <img src="/images/header_banner.jpg" alt="Header Banner" style={{ width: '100%', display: 'block' }} />
+                  </div>
+
+                  {/* Main Body - Absolute Middle */}
+                  <div style={{
+                    position: 'absolute',
+                    top: '42mm',
+                    bottom: '40mm',
+                    left: 0,
+                    right: 0,
+                    padding: '0 20mm',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    boxSizing: 'border-box'
+                  }}>
+                    <div style={{ textAlign: 'left', marginBottom: '8mm', fontSize: '13pt', lineHeight: '1.4' }}>
+                      To<br />
+                      The Security Officer<br />
+                      Technopark
+                    </div>
+
+                    <div style={{ textAlign: 'right', marginBottom: '8mm', fontSize: '12pt' }}>
+                      {formattedDate}
+                    </div>
+
+                    <div style={{ marginBottom: '6mm' }}>
+                      Sir/ Ma'am
+                    </div>
+
+                    <div style={{ marginBottom: '10mm', textAlign: 'justify' }}>
+                      Please permit our trainee <span style={{ textTransform: 'uppercase' }}>{pass.name}</span> to enter Technopark campus {validityText}.
+                    </div>
+
+                    {/* Passport Photo */}
+                    <div style={{
+                      width: '35mm',
+                      height: '45mm',
+                      border: '1px solid #000000',
+                      padding: '1px',
+                      backgroundColor: '#FFFFFF',
+                      marginBottom: '10mm'
+                    }}>
+                      <img src={getPhotoUrl(pass.photoUrl)} alt="Trainee" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    </div>
+
+                    {/* Note */}
+                    <div style={{ fontSize: '10.5pt', color: '#333333', marginBottom: '10mm', lineHeight: '1.5' }}>
+                      Note: For issuing new gate passes you must submit this back to the admin. In case you lose your gate pass there will be a fine of Rs 1000.
+                    </div>
+
+                    {/* Bottom Stamps & HR section */}
+                    <div style={{ marginTop: '8mm' }}>
+                      {/* Signatures & Stamps */}
+                      <div style={{ position: 'relative', height: '25mm', marginBottom: '6mm' }}>
+                        {/* Signature (stamp_large) - Sign first */}
+                        <img src="/images/stamp_large.png" alt="Srishti Seal" style={{ width: '20.73mm', height: '17.47mm', position: 'absolute', left: '0', bottom: '0', zIndex: 1 }} />
+                        {/* Seal (stamp_small) - Seal over signature */}
+                        <img src="/images/stamp_small.png" alt="Srishti Stamp" style={{ width: '25.59mm', height: '24.85mm', position: 'absolute', left: '18mm', bottom: '0', zIndex: 2 }} />
+                      </div>
+
+                      {/* HR Contact info */}
+                      <div style={{ fontSize: '12pt', lineHeight: '1.3' }}>Aarthi A G</div>
+                      <div style={{ fontSize: '10pt', color: '#333333', lineHeight: '1.4' }}>
+                        Contact No: +91-9072442200<br />
+                        HR Team – Srishti Innovative
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Footer Banner - Absolute Bottom */}
+                  <div style={{ position: 'absolute', bottom: 0, left: 0, width: '100%', height: 'auto' }}>
+                    <img src="/images/footer_banner.jpg" alt="Footer Banner" style={{ width: '100%', display: 'block' }} />
+                  </div>
+                </div>
+              );
+            })
+          )}
         </div>,
         document.body
       )}

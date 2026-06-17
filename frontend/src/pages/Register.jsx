@@ -201,7 +201,7 @@ const Register = () => {
         {/* Top Header Card */}
         <Box sx={{ textAlign: 'center', mb: 3 }}>
           <Typography variant="h4" sx={{ fontWeight: 800, color: '#0F172A', letterSpacing: '-0.5px' }}>
-            Techno<span style={{ color: '#2563EB' }}>Pass</span>
+            Srishti<span style={{ color: '#2563EB' }}>Pass</span>
           </Typography>
           <Typography variant="body2" color="textSecondary" sx={{ mt: 1 }}>
             Internship & Trainee Gate Pass Request Form

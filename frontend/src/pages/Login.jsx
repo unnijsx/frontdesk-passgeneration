@@ -93,7 +93,7 @@ const Login = () => {
             <BadgeIcon sx={{ fontSize: 28 }} />
           </Avatar>
           <Typography variant="h4" sx={{ fontWeight: 800, color: '#FFFFFF', letterSpacing: '0.5px' }}>
-            Techno<span style={{ color: '#2563EB' }}>Pass</span>
+            Srishti<span style={{ color: '#2563EB' }}>Pass</span>
           </Typography>
           <Typography variant="body2" sx={{ color: '#94A3B8', mt: 1 }}>
             Campus Gate Pass Management Portal

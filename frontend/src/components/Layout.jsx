@@ -80,7 +80,7 @@ const Layout = ({ children }) => {
       <Box sx={{ p: 2, display: 'flex', alignItems: 'center', gap: 1.5, borderBottom: '1px solid #1E293B', height: 64 }}>
         <BadgeIcon sx={{ color: '#2563EB', fontSize: 32 }} />
         <Typography variant="h6" sx={{ fontWeight: 800, letterSpacing: '0.5px', color: '#FFFFFF' }}>
-          Techno<span style={{ color: '#2563EB' }}>Pass</span>
+          Srishti<span style={{ color: '#2563EB' }}>Pass</span>
         </Typography>
       </Box>
       

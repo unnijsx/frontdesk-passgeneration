@@ -41,7 +41,7 @@ const uploadPhoto = async (req, res, next) => {
 
     try {
       // 1. Try uploading to Cloudinary using stream
-      const uploadResult = await uploadStream(req.file.buffer, 'technopass_student_photos');
+      const uploadResult = await uploadStream(req.file.buffer, 'srishtipass_student_photos');
       return res.status(200).json({
         success: true,
         photoUrl: uploadResult.secure_url
