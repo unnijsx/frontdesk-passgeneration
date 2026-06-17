@@ -107,6 +107,42 @@ const Dashboard = () => {
   // Row expansion (for groups)
   const [expandedRows, setExpandedRows] = useState({});
 
+  // Toast notification state
+  const [toast, setToast] = useState({ open: false, message: '', severity: 'success' });
+  const showToast = (message, severity = 'success') => {
+    setToast({ open: true, message, severity });
+  };
+
+  // Custom confirmation dialog state
+  const [confirmDialog, setConfirmDialog] = useState({
+    open: false,
+    title: '',
+    message: '',
+    severity: 'primary',
+    action: null
+  });
+
+  const triggerConfirm = (title, message, action, severity = 'primary') => {
+    setConfirmDialog({
+      open: true,
+      title,
+      message,
+      severity,
+      action
+    });
+  };
+
+  const handleConfirmClose = () => {
+    setConfirmDialog(prev => ({ ...prev, open: false }));
+  };
+
+  const handleConfirmExecute = async () => {
+    if (confirmDialog.action) {
+      await confirmDialog.action();
+    }
+    handleConfirmClose();
+  };
+
   // Debounce search input
   useEffect(() => {
     const handler = setTimeout(() => {
@@ -253,53 +289,79 @@ const Dashboard = () => {
 
   // Reject Submissions (Immediate, no date required)
   const handleRejectSubmission = async (id) => {
-    if (window.confirm('Are you sure you want to reject this submission group?')) {
-      try {
-        await api.put(`/submissions/${id}/status`, { status: 'rejected' });
-        queryClient.invalidateQueries(['submissions']);
-        queryClient.invalidateQueries(['stats']);
-      } catch (err) {
-        console.error(err);
-      }
-    }
+    triggerConfirm(
+      'Reject Submission Group',
+      'Are you sure you want to reject this submission group?',
+      async () => {
+        try {
+          await api.put(`/submissions/${id}/status`, { status: 'rejected' });
+          queryClient.invalidateQueries(['submissions']);
+          queryClient.invalidateQueries(['stats']);
+          showToast('Submission group rejected successfully.', 'success');
+        } catch (err) {
+          console.error(err);
+          showToast('Failed to reject submission group.', 'error');
+        }
+      },
+      'error'
+    );
   };
 
   const handleRejectStudent = async (id, studentId) => {
-    if (window.confirm('Are you sure you want to reject this student?')) {
-      try {
-        await api.put(`/submissions/${id}/students/${studentId}/status`, { status: 'rejected' });
-        queryClient.invalidateQueries(['submissions']);
-        queryClient.invalidateQueries(['stats']);
-      } catch (err) {
-        console.error(err);
-      }
-    }
+    triggerConfirm(
+      'Reject Student',
+      'Are you sure you want to reject this student?',
+      async () => {
+        try {
+          await api.put(`/submissions/${id}/students/${studentId}/status`, { status: 'rejected' });
+          queryClient.invalidateQueries(['submissions']);
+          queryClient.invalidateQueries(['stats']);
+          showToast('Student rejected successfully.', 'success');
+        } catch (err) {
+          console.error(err);
+          showToast('Failed to reject student.', 'error');
+        }
+      },
+      'error'
+    );
   };
 
   const handleArchiveSubmission = async (id) => {
-    if (window.confirm('Are you sure you want to archive this submission? It will be hidden from the active list.')) {
-      try {
-        await api.put(`/submissions/${id}/status`, { status: 'archived' });
-        queryClient.invalidateQueries(['submissions']);
-        queryClient.invalidateQueries(['stats']);
-      } catch (err) {
-        console.error(err);
-        alert(err.response?.data?.message || 'Failed to archive submission.');
-      }
-    }
+    triggerConfirm(
+      'Archive Submission',
+      'Are you sure you want to archive this submission? It will be hidden from the active list.',
+      async () => {
+        try {
+          await api.put(`/submissions/${id}/status`, { status: 'archived' });
+          queryClient.invalidateQueries(['submissions']);
+          queryClient.invalidateQueries(['stats']);
+          showToast('Submission archived successfully.', 'success');
+        } catch (err) {
+          console.error(err);
+          showToast(err.response?.data?.message || 'Failed to archive submission.', 'error');
+        }
+      },
+      'warning'
+    );
   };
 
   const handleDeleteSubmission = async (id) => {
-    if (window.confirm('Are you sure you want to PERMANENTLY delete this submission? This action cannot be undone.')) {
-      try {
-        await api.delete(`/submissions/${id}`);
-        queryClient.invalidateQueries(['submissions']);
-        queryClient.invalidateQueries(['stats']);
-      } catch (err) {
-        console.error(err);
-        alert(err.response?.data?.message || 'Failed to delete submission.');
-      }
-    }
+    triggerConfirm(
+      'Delete Submission',
+      'Are you sure you want to PERMANENTLY delete this submission? This action cannot be undone.',
+      async () => {
+        try {
+          await api.delete(`/submissions/${id}`);
+          queryClient.invalidateQueries(['submissions']);
+          queryClient.invalidateQueries(['stats']);
+          showToast('Submission deleted successfully.', 'success');
+        } catch (err) {
+          console.error(err);
+          showToast(err.response?.data?.message || 'Failed to delete submission.', 'error');
+        }
+      },
+      'error'
+    );
   };
 
   const handleRestoreSubmission = async (id) => {
@@ -307,9 +369,10 @@ const Dashboard = () => {
       await api.put(`/submissions/${id}/status`, { status: 'pending' });
       queryClient.invalidateQueries(['submissions']);
       queryClient.invalidateQueries(['stats']);
+      showToast('Submission restored to pending successfully.', 'success');
     } catch (err) {
       console.error(err);
-      alert(err.response?.data?.message || 'Failed to restore submission.');
+      showToast(err.response?.data?.message || 'Failed to restore submission.', 'error');
     }
   };
 
@@ -364,7 +427,7 @@ const Dashboard = () => {
       sub.students.some(s => selectedStudentIds.includes(s._id) && s.status === 'approved')
     );
     if (!hasApproved) {
-      alert('Only APPROVED passes can be printed. Please approve selected students first.');
+      showToast('Only APPROVED passes can be printed. Please approve selected students first.', 'warning');
       return;
     }
     setPendingPrint({ isBulk: true });
@@ -397,7 +460,7 @@ const Dashboard = () => {
       });
 
       if (printList.length === 0) {
-        alert('No approved passes selected for printing.');
+        showToast('No approved passes selected for printing.', 'warning');
         setPrintDialogOpen(false);
         return;
       }
@@ -1324,6 +1387,55 @@ const Dashboard = () => {
         </div>,
         document.body
       )}
+
+      {/* CUSTOM CONFIRMATION DIALOG */}
+      <Dialog
+        open={confirmDialog.open}
+        onClose={handleConfirmClose}
+        maxWidth="xs"
+        fullWidth
+      >
+        <DialogTitle sx={{ fontWeight: 700 }}>{confirmDialog.title}</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="textSecondary">
+            {confirmDialog.message}
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ p: 2.5 }}>
+          <Button onClick={handleConfirmClose} sx={{ color: '#64748B' }}>
+            Cancel
+          </Button>
+          <Button
+            variant="contained"
+            color={confirmDialog.severity === 'error' ? 'error' : confirmDialog.severity === 'warning' ? 'warning' : 'primary'}
+            onClick={handleConfirmExecute}
+            sx={{
+              bgcolor: confirmDialog.severity === 'warning' ? '#F59E0B' : undefined,
+              '&:hover': {
+                bgcolor: confirmDialog.severity === 'warning' ? '#D97706' : undefined,
+              }
+            }}
+          >
+            Confirm
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* TOAST NOTIFICATIONS */}
+      <Snackbar
+        open={toast.open}
+        autoHideDuration={4000}
+        onClose={() => setToast(prev => ({ ...prev, open: false }))}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
+      >
+        <Alert
+          onClose={() => setToast(prev => ({ ...prev, open: false }))}
+          severity={toast.severity}
+          sx={{ width: '100%', borderRadius: 2 }}
+        >
+          {toast.message}
+        </Alert>
+      </Snackbar>
     </Layout>
   );
 };

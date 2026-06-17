@@ -31,7 +31,9 @@ import {
 import {
   Print as PrintIcon,
   Search as SearchIcon,
-  CalendarMonth as CalendarIcon
+  CalendarMonth as CalendarIcon,
+  Check as RestoreIcon,
+  Delete as DeleteIcon
 } from '@mui/icons-material';
 
 import Layout from '../components/Layout';
@@ -44,12 +46,49 @@ const History = () => {
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('printed'); // 'printed' | 'archived'
   const [dateFilter, setDateFilter] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
 
   // Print system state
   const [passToPrint, setPassToPrint] = useState(null);
+
+  // Toast notification state
+  const [toast, setToast] = useState({ open: false, message: '', severity: 'success' });
+  const showToast = (message, severity = 'success') => {
+    setToast({ open: true, message, severity });
+  };
+
+  // Custom confirmation dialog state
+  const [confirmDialog, setConfirmDialog] = useState({
+    open: false,
+    title: '',
+    message: '',
+    severity: 'primary',
+    action: null
+  });
+
+  const triggerConfirm = (title, message, action, severity = 'primary') => {
+    setConfirmDialog({
+      open: true,
+      title,
+      message,
+      severity,
+      action
+    });
+  };
+
+  const handleConfirmClose = () => {
+    setConfirmDialog(prev => ({ ...prev, open: false }));
+  };
+
+  const handleConfirmExecute = async () => {
+    if (confirmDialog.action) {
+      await confirmDialog.action();
+    }
+    handleConfirmClose();
+  };
 
   // Photo modal state
   const [photoModalOpen, setPhotoModalOpen] = useState(false);
@@ -67,16 +106,16 @@ const History = () => {
     return () => clearTimeout(handler);
   }, [search]);
 
-  // Fetch Submissions list filtered specifically by 'printed'
+  // Fetch Submissions list
   const { data: submissionsData, isLoading, refetch } = useQuery({
-    queryKey: ['history', page, rowsPerPage, debouncedSearch, dateFilter, startDate, endDate],
+    queryKey: ['history', page, rowsPerPage, debouncedSearch, statusFilter, dateFilter, startDate, endDate],
     queryFn: async () => {
       const res = await api.get('/submissions', {
         params: {
           page: page + 1,
           limit: rowsPerPage,
           search: debouncedSearch,
-          status: 'printed', // Filter specifically for printed status
+          status: statusFilter,
           dateFilter,
           startDate,
           endDate
@@ -93,7 +132,7 @@ const History = () => {
     const list = [];
     submissionsData.data.forEach(sub => {
       sub.students.forEach(stud => {
-        if (stud.passGenerated) {
+        if (statusFilter === 'archived' || stud.passGenerated) {
           list.push({
             submissionId: sub._id,
             requestId: sub.requestId,
@@ -108,6 +147,35 @@ const History = () => {
   };
 
   const printedList = getPrintedStudentsList();
+
+  const handleRestoreSubmission = async (id) => {
+    try {
+      await api.put(`/submissions/${id}/status`, { status: 'pending' });
+      refetch();
+      showToast('Submission restored to pending successfully.', 'success');
+    } catch (err) {
+      console.error(err);
+      showToast(err.response?.data?.message || 'Failed to restore submission.', 'error');
+    }
+  };
+
+  const handleDeleteSubmission = async (id) => {
+    triggerConfirm(
+      'Delete Submission',
+      'Are you sure you want to PERMANENTLY delete this submission? This action cannot be undone.',
+      async () => {
+        try {
+          await api.delete(`/submissions/${id}`);
+          refetch();
+          showToast('Submission deleted successfully.', 'success');
+        } catch (err) {
+          console.error(err);
+          showToast(err.response?.data?.message || 'Failed to delete submission.', 'error');
+        }
+      },
+      'error'
+    );
+  };
 
   const handleReprintPass = (student) => {
     setPassToPrint({
@@ -184,7 +252,7 @@ const History = () => {
               <TextField
                 fullWidth
                 size="small"
-                label="Search Printed Passes"
+                label="Search Passes"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Search by name, phone, or Request ID..."
@@ -194,8 +262,23 @@ const History = () => {
               />
             </Grid>
 
+            {/* Type Filter */}
+            <Grid item xs={12} md={2.5}>
+              <FormControl fullWidth size="small">
+                <InputLabel>Type</InputLabel>
+                <Select
+                  value={statusFilter}
+                  label="Type"
+                  onChange={(e) => { setStatusFilter(e.target.value); setPage(0); }}
+                >
+                  <MenuItem value="printed">Printed Passes</MenuItem>
+                  <MenuItem value="archived">Archived Submissions</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+
             {/* Date Option Filter */}
-            <Grid item xs={12} md={3}>
+            <Grid item xs={12} md={2.5}>
               <FormControl fullWidth size="small">
                 <InputLabel>Date Option</InputLabel>
                 <Select
@@ -214,7 +297,7 @@ const History = () => {
 
             {/* Sub-date selections */}
             {(dateFilter === 'custom' || dateFilter === 'range') && (
-              <Grid item xs={12} md={5} sx={{ display: 'flex', gap: 1.5 }}>
+              <Grid item xs={12} md={3} sx={{ display: 'flex', gap: 1.5 }}>
                 <TextField
                   type="date"
                   size="small"
@@ -306,15 +389,43 @@ const History = () => {
                   </TableCell>
                   <TableCell>{row.printedAt ? new Date(row.printedAt).toLocaleString() : 'N/A'}</TableCell>
                   <TableCell align="right">
-                    <Tooltip title="Reprint Gate Pass">
-                      <IconButton
-                        size="small"
-                        onClick={() => handleReprintPass(row)}
-                        sx={{ color: '#2563EB', bgcolor: '#EFF6FF' }}
-                      >
-                        <PrintIcon fontSize="small" />
-                      </IconButton>
-                    </Tooltip>
+                    <Stack direction="row" spacing={1} justifyContent="flex-end">
+                      {statusFilter === 'archived' && (
+                        <Tooltip title="Restore Request to Pending">
+                          <IconButton
+                            size="small"
+                            onClick={() => handleRestoreSubmission(row.submissionId)}
+                            sx={{ color: '#10B981', bgcolor: '#ECFDF5', '&:hover': { bgcolor: '#D1FAE5' } }}
+                          >
+                            <RestoreIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                      )}
+                      
+                      {row.passGenerated && (
+                        <Tooltip title="Reprint Gate Pass">
+                          <IconButton
+                            size="small"
+                            onClick={() => handleReprintPass(row)}
+                            sx={{ color: '#2563EB', bgcolor: '#EFF6FF', '&:hover': { bgcolor: '#DBEAFE' } }}
+                          >
+                            <PrintIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                      )}
+
+                      {statusFilter === 'archived' && (
+                        <Tooltip title="Delete Request Permanently">
+                          <IconButton
+                            size="small"
+                            onClick={() => handleDeleteSubmission(row.submissionId)}
+                            sx={{ color: '#EF4444', bgcolor: '#FEF2F2', '&:hover': { bgcolor: '#FEE2E2' } }}
+                          >
+                            <DeleteIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                      )}
+                    </Stack>
                   </TableCell>
                 </TableRow>
               ))
@@ -455,6 +566,55 @@ const History = () => {
         </div>,
         document.body
       )}
+
+      {/* CUSTOM CONFIRMATION DIALOG */}
+      <Dialog
+        open={confirmDialog.open}
+        onClose={handleConfirmClose}
+        maxWidth="xs"
+        fullWidth
+      >
+        <DialogTitle sx={{ fontWeight: 700 }}>{confirmDialog.title}</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="textSecondary">
+            {confirmDialog.message}
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ p: 2.5 }}>
+          <Button onClick={handleConfirmClose} sx={{ color: '#64748B' }}>
+            Cancel
+          </Button>
+          <Button
+            variant="contained"
+            color={confirmDialog.severity === 'error' ? 'error' : confirmDialog.severity === 'warning' ? 'warning' : 'primary'}
+            onClick={handleConfirmExecute}
+            sx={{
+              bgcolor: confirmDialog.severity === 'warning' ? '#F59E0B' : undefined,
+              '&:hover': {
+                bgcolor: confirmDialog.severity === 'warning' ? '#D97706' : undefined,
+              }
+            }}
+          >
+            Confirm
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* TOAST NOTIFICATIONS */}
+      <Snackbar
+        open={toast.open}
+        autoHideDuration={4000}
+        onClose={() => setToast(prev => ({ ...prev, open: false }))}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
+      >
+        <Alert
+          onClose={() => setToast(prev => ({ ...prev, open: false }))}
+          severity={toast.severity}
+          sx={{ width: '100%', borderRadius: 2 }}
+        >
+          {toast.message}
+        </Alert>
+      </Snackbar>
     </Layout>
   );
 };

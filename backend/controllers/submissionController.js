@@ -156,8 +156,8 @@ const getSubmissions = async (req, res, next) => {
       } else {
         query.status = status;
       }
-    } else {
-      // Don't show archived by default unless specifically asked
+    } else if (!search) {
+      // Don't show archived by default unless searching or specifically asked
       query.status = { $ne: 'archived' };
     }
 
