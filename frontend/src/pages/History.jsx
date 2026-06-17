@@ -122,10 +122,36 @@ const History = () => {
   // Perform print trigger when printable pass state changes
   useEffect(() => {
     if (passToPrint) {
-      setTimeout(() => {
+      // Wait for every <img> in the print container to fully load before printing
+      const waitForImages = () => new Promise((resolve) => {
+        // Small initial delay to let React render the portal into the DOM
+        setTimeout(() => {
+          const container = document.getElementById('printable-pass-container');
+          if (!container) return resolve();
+          const images = Array.from(container.querySelectorAll('img'));
+          if (images.length === 0) return resolve();
+
+          let pending = images.length;
+          const onDone = () => { if (--pending === 0) resolve(); };
+
+          images.forEach(img => {
+            if (img.complete && img.naturalHeight !== 0) {
+              onDone();
+            } else {
+              img.addEventListener('load', onDone, { once: true });
+              img.addEventListener('error', onDone, { once: true });
+            }
+          });
+
+          // Safety fallback: print after 5s even if some images fail
+          setTimeout(resolve, 5000);
+        }, 100);
+      });
+
+      waitForImages().then(() => {
         window.print();
         setPassToPrint(null);
-      }, 500);
+      });
     }
   }, [passToPrint]);
 

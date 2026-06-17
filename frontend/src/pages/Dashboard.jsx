@@ -78,8 +78,9 @@ const Dashboard = () => {
 
   // UI Dialog States
   const [selectedSubmission, setSelectedSubmission] = useState(null);
-  const [selectedStudentId, setSelectedStudentId] = useState(null); // for single student actions
-  const [approvalDialogOpen, setApprovalDialogOpen] = useState(false);
+  const [selectedStudentId, setSelectedStudentId] = useState(null);
+  const [printDialogOpen, setPrintDialogOpen] = useState(false);  // date picker shown before printing
+  const [pendingPrint, setPendingPrint] = useState(null);          // { submission, student } | { isBulk: true }
   const [validityType, setValidityType] = useState('today'); // 'today' | 'tomorrow' | 'custom' | 'range'
   const [customValDate, setCustomValDate] = useState('');
   const [valFromDate, setValFromDate] = useState('');
@@ -222,8 +223,6 @@ const Dashboard = () => {
     onSuccess: () => {
       queryClient.invalidateQueries(['submissions']);
       queryClient.invalidateQueries(['stats']);
-      setApprovalDialogOpen(false);
-      setSelectedSubmission(null);
     }
   });
 
@@ -235,9 +234,6 @@ const Dashboard = () => {
     onSuccess: () => {
       queryClient.invalidateQueries(['submissions']);
       queryClient.invalidateQueries(['stats']);
-      setApprovalDialogOpen(false);
-      setSelectedSubmission(null);
-      setSelectedStudentId(null);
     }
   });
 
@@ -246,12 +242,9 @@ const Dashboard = () => {
     mutationFn: async ({ studentIds, action, dates }) => {
       return await api.post(`/submissions/bulk-action`, { studentIds, action, ...dates });
     },
-    onSuccess: (data, variables) => {
+    onSuccess: () => {
       queryClient.invalidateQueries(['submissions']);
       queryClient.invalidateQueries(['stats']);
-      if (variables.action === 'approve') {
-        setApprovalDialogOpen(false);
-      }
       setSelectedStudentIds([]);
     }
   });
@@ -281,37 +274,146 @@ const Dashboard = () => {
     }
   };
 
-  // Open Approval date selectors
-  const openApprovalDialog = (submission, studentId = null) => {
-    setSelectedSubmission(submission);
-    setSelectedStudentId(studentId);
-    setApprovalDialogOpen(true);
+  // --- APPROVE: Immediate (no dialog, uses today as placeholder date) ---
+  const handleApproveGroup = (submission) => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const todayEnd = new Date(today);
+    todayEnd.setHours(23, 59, 59, 999);
+    approveGroupMutation.mutate({
+      id: submission._id,
+      dates: { validFrom: today.toISOString(), validTo: todayEnd.toISOString() }
+    });
   };
 
-  const handleApprovalConfirm = () => {
+  const handleApproveStudent = (submission, studentId) => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const todayEnd = new Date(today);
+    todayEnd.setHours(23, 59, 59, 999);
+    approveStudentMutation.mutate({
+      id: submission._id,
+      studentId,
+      dates: { validFrom: today.toISOString(), validTo: todayEnd.toISOString() }
+    });
+  };
+
+  const handleBulkApprove = () => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const todayEnd = new Date(today);
+    todayEnd.setHours(23, 59, 59, 999);
+    bulkActionMutation.mutate({
+      studentIds: selectedStudentIds,
+      action: 'approve',
+      dates: { validFrom: today.toISOString(), validTo: todayEnd.toISOString() }
+    });
+  };
+
+  // --- PRINT: Open date range dialog first, then print ---
+  const openPrintDialog = (submission, student) => {
+    setPendingPrint({ submission, student, isBulk: false });
+    setValidityType('today');
+    setCustomValDate('');
+    setValFromDate('');
+    setValToDate('');
+    setPrintDialogOpen(true);
+  };
+
+  const openBulkPrintDialog = () => {
+    const hasApproved = submissionsData?.data?.some(sub =>
+      sub.students.some(s => selectedStudentIds.includes(s._id) && s.status === 'approved')
+    );
+    if (!hasApproved) {
+      alert('Only APPROVED passes can be printed. Please approve selected students first.');
+      return;
+    }
+    setPendingPrint({ isBulk: true });
+    setValidityType('today');
+    setCustomValDate('');
+    setValFromDate('');
+    setValToDate('');
+    setPrintDialogOpen(true);
+  };
+
+  const handlePrintConfirm = async () => {
     const dates = getValidityDates();
 
-    if (selectedStudentId === 'BULK') {
-      // Bulk approve selected checkboxes
-      bulkActionMutation.mutate({
-        studentIds: selectedStudentIds,
-        action: 'approve',
-        dates
+    if (pendingPrint?.isBulk) {
+      // Collect only approved students from current selection
+      const printList = [];
+      submissionsData?.data?.forEach(sub => {
+        sub.students.forEach(stud => {
+          if (selectedStudentIds.includes(stud._id) && stud.status === 'approved') {
+            printList.push({
+              name: stud.name,
+              photoUrl: stud.photoUrl,
+              requestId: sub.requestId,
+              validFrom: dates.validFrom,
+              validTo: dates.validTo,
+              _id: stud._id
+            });
+          }
+        });
       });
-    } else if (selectedStudentId) {
-      // Single student inside a group
-      approveStudentMutation.mutate({
-        id: selectedSubmission._id,
-        studentId: selectedStudentId,
-        dates
-      });
+
+      if (printList.length === 0) {
+        alert('No approved passes selected for printing.');
+        setPrintDialogOpen(false);
+        return;
+      }
+
+      setPassesToPrint(printList);
+
+      // Save print dates to DB and mark as printed
+      try {
+        await api.post('/submissions/bulk-action', {
+          studentIds: printList.map(p => p._id),
+          action: 'approve',
+          ...dates
+        });
+        await api.post('/submissions/bulk-action', {
+          studentIds: printList.map(p => p._id),
+          action: 'mark_printed'
+        });
+        queryClient.invalidateQueries(['submissions']);
+        queryClient.invalidateQueries(['stats']);
+      } catch (e) { console.error(e); }
+
+      setSelectedStudentIds([]);
     } else {
-      // Entire group
-      approveGroupMutation.mutate({
-        id: selectedSubmission._id,
-        dates
-      });
+      // Single student print
+      const { submission, student } = pendingPrint;
+
+      // Save chosen validity dates to DB
+      try {
+        await api.put(`/submissions/${submission._id}/students/${student._id}/status`, {
+          status: 'approved',
+          ...dates
+        });
+      } catch (e) { console.error(e); }
+
+      setPassesToPrint([{
+        name: student.name,
+        photoUrl: student.photoUrl,
+        requestId: submission.requestId,
+        validFrom: dates.validFrom,
+        validTo: dates.validTo
+      }]);
+
+      // Mark as printed
+      try {
+        await api.post('/submissions/bulk-action', {
+          studentIds: [student._id],
+          action: 'mark_printed'
+        });
+        queryClient.invalidateQueries(['submissions']);
+        queryClient.invalidateQueries(['stats']);
+      } catch (e) { console.error(e); }
     }
+
+    setPrintDialogOpen(false);
+    setPendingPrint(null);
   };
 
   // Bulk reject handler
@@ -359,80 +461,39 @@ const Dashboard = () => {
   // PRINT PASSES SYSTEM
   const [passesToPrint, setPassesToPrint] = useState([]);
 
-  const handlePrintPass = async (submission, student) => {
-    // Single print
-    setPassesToPrint([{
-      name: student.name,
-      photoUrl: student.photoUrl,
-      requestId: submission.requestId,
-      validFrom: student.validFrom,
-      validTo: student.validTo
-    }]);
-
-    // Mark as printed in the DB
-    try {
-      await api.post('/submissions/bulk-action', {
-        studentIds: [student._id],
-        action: 'mark_printed'
-      });
-      queryClient.invalidateQueries(['submissions']);
-      queryClient.invalidateQueries(['stats']);
-    } catch (e) {
-      console.error(e);
-    }
-  };
-
-  const handleBulkPrint = async () => {
-    // Collect all student structures from selection list
-    const printList = [];
-    if (!submissionsData?.data) return;
-
-    submissionsData.data.forEach(sub => {
-      sub.students.forEach(stud => {
-        if (selectedStudentIds.includes(stud._id) && stud.status === 'approved') {
-          printList.push({
-            name: stud.name,
-            photoUrl: stud.photoUrl,
-            requestId: sub.requestId,
-            validFrom: stud.validFrom,
-            validTo: stud.validTo
-          });
-        }
-      });
-    });
-
-    if (printList.length === 0) {
-      alert('Only APPROVED passes can be printed. Please approve selected students first.');
-      return;
-    }
-
-    setPassesToPrint(printList);
-
-    // Mark as printed
-    try {
-      await api.post('/submissions/bulk-action', {
-        studentIds: printList.map(p => selectedStudentIds.find(id => {
-          // match by finding corresponding student in selections
-          return true; // bulk markings
-        })), // or simpler, pass the actual selected student IDs that are approved
-        studentIds: selectedStudentIds,
-        action: 'mark_printed'
-      });
-      queryClient.invalidateQueries(['submissions']);
-      queryClient.invalidateQueries(['stats']);
-    } catch (e) {
-      console.error(e);
-    }
-  };
-
   // Perform browser native print dialogue when printable state updates
   useEffect(() => {
     if (passesToPrint.length > 0) {
-      setTimeout(() => {
+      // Wait for every <img> in the print container to fully load before printing
+      const waitForImages = () => new Promise((resolve) => {
+        // Small initial delay to let React render the portal into the DOM
+        setTimeout(() => {
+          const container = document.getElementById('printable-pass-container');
+          if (!container) return resolve();
+          const images = Array.from(container.querySelectorAll('img'));
+          if (images.length === 0) return resolve();
+
+          let pending = images.length;
+          const onDone = () => { if (--pending === 0) resolve(); };
+
+          images.forEach(img => {
+            if (img.complete && img.naturalHeight !== 0) {
+              onDone();
+            } else {
+              img.addEventListener('load', onDone, { once: true });
+              img.addEventListener('error', onDone, { once: true });
+            }
+          });
+
+          // Safety fallback: print after 5s even if some images fail
+          setTimeout(resolve, 5000);
+        }, 100);
+      });
+
+      waitForImages().then(() => {
         window.print();
-        // Clear printer container after printing
         setPassesToPrint([]);
-      }, 500);
+      });
     }
   }, [passesToPrint]);
 
@@ -604,7 +665,7 @@ const Dashboard = () => {
                 color="success"
                 size="small"
                 startIcon={<ApproveIcon />}
-                onClick={() => openApprovalDialog(null, 'BULK')}
+                onClick={handleBulkApprove}
               >
                 Approve Selected
               </Button>
@@ -622,7 +683,7 @@ const Dashboard = () => {
                 color="primary"
                 size="small"
                 startIcon={<PrintIcon />}
-                onClick={handleBulkPrint}
+                onClick={openBulkPrintDialog}
               >
                 Print Passes
               </Button>
@@ -766,7 +827,7 @@ const Dashboard = () => {
                               <Tooltip title={submission.students.length > 1 ? "Approve Entire Group" : "Approve Student"}>
                                 <IconButton
                                   size="small"
-                                  onClick={() => openApprovalDialog(submission)}
+                                  onClick={() => handleApproveGroup(submission)}
                                   sx={{ color: '#10B981', bgcolor: '#ECFDF5', '&:hover': { bgcolor: '#D1FAE5' } }}
                                 >
                                   <ApproveIcon fontSize="small" />
@@ -788,7 +849,7 @@ const Dashboard = () => {
                             <Tooltip title="Print Gate Pass">
                               <IconButton
                                 size="small"
-                                onClick={() => handlePrintPass(submission, submission.students[0])}
+                                onClick={() => openPrintDialog(submission, submission.students[0])}
                                 sx={{ color: '#2563EB', bgcolor: '#EFF6FF', '&:hover': { bgcolor: '#DBEAFE' } }}
                               >
                                 <PrintIcon fontSize="small" />
@@ -873,7 +934,7 @@ const Dashboard = () => {
                                               <Tooltip title="Approve Student">
                                                 <IconButton
                                                   size="small"
-                                                  onClick={() => openApprovalDialog(submission, student._id)}
+                                                  onClick={() => handleApproveStudent(submission, student._id)}
                                                   sx={{ color: '#10B981' }}
                                                 >
                                                   <ApproveIcon fontSize="small" />
@@ -894,7 +955,7 @@ const Dashboard = () => {
                                             <Tooltip title="Print Gate Pass">
                                               <IconButton
                                                 size="small"
-                                                onClick={() => handlePrintPass(submission, student)}
+                                                onClick={() => openPrintDialog(submission, student)}
                                                 sx={{ color: '#2563EB', bgcolor: '#EFF6FF' }}
                                               >
                                                 <PrintIcon fontSize="small" />
@@ -931,9 +992,9 @@ const Dashboard = () => {
         />
       </TableContainer>
 
-      {/* DATE VALIDITY PICKER DIALOG */}
-      <Dialog open={approvalDialogOpen} onClose={() => setApprovalDialogOpen(false)} maxWidth="xs" fullWidth>
-        <DialogTitle sx={{ fontWeight: 700 }}>Set Gate Pass Validity</DialogTitle>
+      {/* PRINT DATE RANGE DIALOG */}
+      <Dialog open={printDialogOpen} onClose={() => setPrintDialogOpen(false)} maxWidth="xs" fullWidth>
+        <DialogTitle sx={{ fontWeight: 700 }}>Select Print Date Range</DialogTitle>
         <DialogContent>
           <Box sx={{ mt: 1.5, display: 'flex', flexDirection: 'column', gap: 2.5 }}>
             <FormControl fullWidth>
@@ -984,11 +1045,11 @@ const Dashboard = () => {
           </Box>
         </DialogContent>
         <DialogActions sx={{ p: 2.5 }}>
-          <Button onClick={() => setApprovalDialogOpen(false)} sx={{ color: '#64748B' }}>
+          <Button onClick={() => setPrintDialogOpen(false)} sx={{ color: '#64748B' }}>
             Cancel
           </Button>
-          <Button variant="contained" color="success" onClick={handleApprovalConfirm}>
-            Confirm Approval
+          <Button variant="contained" color="primary" startIcon={<PrintIcon />} onClick={handlePrintConfirm}>
+            Print Pass
           </Button>
         </DialogActions>
       </Dialog>

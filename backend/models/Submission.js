@@ -67,8 +67,11 @@ const submissionSchema = new mongoose.Schema(
   }
 );
 
-// Compound indexes if needed, e.g. status + createdAt for dashboard aggregation
-submissionSchema.index({ status: 1, createdAt: -1 });
-submissionSchema.index({ createdAt: -1 });
+// Compound indexes for common query patterns
+submissionSchema.index({ status: 1, createdAt: -1 });   // default dashboard sort
+submissionSchema.index({ createdAt: -1 });               // timeline sort
+submissionSchema.index({ phoneNumber: 1 });              // phone search
+submissionSchema.index({ 'students._id': 1 });           // bulk action $in lookup
+submissionSchema.index({ requestId: 1, phoneNumber: 1 });// combined SC- / digit search ($or)
 
 module.exports = mongoose.model('Submission', submissionSchema);

@@ -141,7 +141,9 @@ const getSubmissions = async (req, res, next) => {
       status = '',
       dateFilter = '', // 'today' | 'tomorrow' | 'range' | 'custom'
       startDate,
-      endDate
+      endDate,
+      sortBy = 'createdAt',
+      sortOrder = 'desc'
     } = req.query;
 
     const query = {};
@@ -187,32 +189,40 @@ const getSubmissions = async (req, res, next) => {
       query.createdAt = { $gte: start, $lte: end };
     }
 
-    // 3. Search query (Index Optimized)
+    // 3. Search query — all-digit input searches BOTH requestId AND phone simultaneously
     if (search) {
-      const searchUpper = search.toUpperCase();
+      const searchStr = search.trim();
+      const searchUpper = searchStr.toUpperCase();
+
       if (searchUpper.startsWith('SC-')) {
+        // Explicit Request ID format
         query.requestId = searchUpper;
-      } else if (/^\d+$/.test(search)) {
-        if (search.length < 8) {
-          // If it is a short number (e.g. 1001), search by Request ID
-          query.requestId = `SC-${search}`;
-        } else {
-          // Otherwise search by phone number
-          query.phoneNumber = new RegExp(search, 'i');
-        }
+      } else if (/^\d+$/.test(searchStr)) {
+        // All digits: match requestId number OR any phone containing these digits
+        query.$or = [
+          { requestId: `SC-${searchStr}` },
+          { phoneNumber: new RegExp(searchStr) }
+        ];
       } else {
-        // Otherwise search in student names
-        query['students.name'] = new RegExp(search, 'i');
+        // Text: search by student name (case-insensitive)
+        query['students.name'] = new RegExp(searchStr, 'i');
       }
     }
 
+    // 4. Sort — whitelist allowed fields to prevent injection
+    const allowedSortFields = ['createdAt', 'requestId', 'phoneNumber', 'status'];
+    const sortField = allowedSortFields.includes(sortBy) ? sortBy : 'createdAt';
+    const sortDir = sortOrder === 'asc' ? 1 : -1;
+
     // Paginate
     const skip = (parseInt(page) - 1) * parseInt(limit);
-    const total = await Submission.countDocuments(query);
-    const submissions = await Submission.find(query)
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(parseInt(limit));
+    const [total, submissions] = await Promise.all([
+      Submission.countDocuments(query),
+      Submission.find(query)
+        .sort({ [sortField]: sortDir })
+        .skip(skip)
+        .limit(parseInt(limit))
+    ]);
 
     res.status(200).json({
       success: true,
@@ -372,14 +382,18 @@ const bulkActionSubmissions = async (req, res, next) => {
   try {
     const fromDate = validFrom ? new Date(validFrom) : new Date();
     const toDate = validTo ? new Date(validTo) : new Date();
+    const printedAt = new Date();
 
-    // Process each student
-    for (const studId of studentIds) {
-      // Find the parent submission document
-      const submission = await Submission.findOne({ 'students._id': studId });
-      if (submission) {
-        const student = submission.students.id(studId);
-        if (student) {
+    // Fetch ALL affected submissions in a SINGLE query (avoids N+1 problem)
+    const submissions = await Submission.find({ 'students._id': { $in: studentIds } });
+
+    // Process each submission and collect save promises for parallel execution
+    const savePromises = submissions.map(submission => {
+      let modified = false;
+
+      submission.students.forEach(student => {
+        if (studentIds.includes(student._id.toString())) {
+          modified = true;
           if (action === 'approve') {
             student.status = 'approved';
             student.validFrom = fromDate;
@@ -388,25 +402,25 @@ const bulkActionSubmissions = async (req, res, next) => {
             student.status = 'rejected';
           } else if (action === 'mark_printed') {
             student.passGenerated = true;
-            student.printedAt = new Date();
+            student.printedAt = printedAt;
           }
         }
+      });
 
-        // Recalculate group status
-        const allApproved = submission.students.every(s => s.status === 'approved');
-        const allRejected = submission.students.every(s => s.status === 'rejected');
+      if (!modified) return null;
 
-        if (allApproved) {
-          submission.status = 'approved';
-        } else if (allRejected) {
-          submission.status = 'rejected';
-        } else {
-          submission.status = 'partially_approved';
-        }
+      // Recalculate group status
+      const allApproved = submission.students.every(s => s.status === 'approved');
+      const allRejected = submission.students.every(s => s.status === 'rejected');
+      if (allApproved) submission.status = 'approved';
+      else if (allRejected) submission.status = 'rejected';
+      else submission.status = 'partially_approved';
 
-        await submission.save();
-      }
-    }
+      return submission.save();
+    }).filter(Boolean);
+
+    // Save all modified submissions in parallel
+    await Promise.all(savePromises);
 
     // Log to Audit Log
     await AuditLog.create({
