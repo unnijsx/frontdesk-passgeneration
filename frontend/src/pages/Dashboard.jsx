@@ -1098,22 +1098,17 @@ const Dashboard = () => {
       {passesToPrint.length > 0 && createPortal(
         <div id="printable-pass-container">
           {passesToPrint.map((pass, index) => {
-          const formattedDate = new Date().toLocaleDateString('en-GB', {
-            day: 'numeric',
-            month: 'long',
-            year: 'numeric'
-          });
+            const formatPrintDate = (dateVal) => {
+              if (!dateVal) return '';
+              return new Date(dateVal).toLocaleDateString('en-GB', {
+                day: 'numeric',
+                month: 'long',
+                year: 'numeric'
+              });
+            };
 
-          const formatPrintDate = (dateVal) => {
-            if (!dateVal) return '';
-            return new Date(dateVal).toLocaleDateString('en-GB', {
-              day: 'numeric',
-              month: 'long',
-              year: 'numeric'
-            });
-          };
-
-          const validFromStr = formatPrintDate(pass.validFrom);
+            const formattedDate = formatPrintDate(pass.validFrom) || formatPrintDate(new Date());
+            const validFromStr = formatPrintDate(pass.validFrom);
           const validToStr = formatPrintDate(pass.validTo);
           const validityText = validFromStr === validToStr 
             ? validFromStr 

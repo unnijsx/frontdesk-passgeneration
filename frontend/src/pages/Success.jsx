@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import {
   Box,
@@ -8,17 +8,28 @@ import {
   Typography,
   Button,
   Paper,
-  Divider
+  Divider,
+  Tooltip,
+  IconButton
 } from '@mui/material';
 import {
-  CheckCircle as CheckIcon,
+  CheckCircle as SuccessIcon,
   HourglassEmpty as PendingIcon,
   QrCode2 as QrIcon,
-  ArrowBack as BackIcon
+  ArrowBack as BackIcon,
+  ContentCopy as CopyIcon,
+  Check as CheckIcon
 } from '@mui/icons-material';
 
 const Success = () => {
   const { requestId } = useParams();
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(requestId || '');
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
 
   // Create QR Code URL using public QR Server API
   const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${requestId || 'SC-UNKNOWN'}&color=0f172a`;
@@ -28,7 +39,7 @@ const Success = () => {
       <Container maxWidth="xs">
         <Card sx={{ border: '1px solid #E2E8F0', borderRadius: 4, overflow: 'hidden', textAlign: 'center' }}>
           <Box sx={{ bgcolor: '#10B981', py: 4, color: 'white', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-            <CheckIcon sx={{ fontSize: 64, mb: 1 }} />
+            <SuccessIcon sx={{ fontSize: 64, mb: 1 }} />
             <Typography variant="h5" sx={{ fontWeight: 800 }}>
               Registration Successful
             </Typography>
@@ -42,9 +53,16 @@ const Success = () => {
             <Typography variant="caption" color="textSecondary" display="block" sx={{ fontWeight: 600, textTransform: 'uppercase', letterSpacing: '1px' }}>
               Request ID
             </Typography>
-            <Typography variant="h4" color="primary" sx={{ fontWeight: 800, mt: 0.5, letterSpacing: '1px' }}>
-              {requestId}
-            </Typography>
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1, mt: 0.5 }}>
+              <Typography variant="h4" color="primary" sx={{ fontWeight: 800, letterSpacing: '1px' }}>
+                {requestId}
+              </Typography>
+              <Tooltip title={copied ? "Copied!" : "Copy Request ID"}>
+                <IconButton onClick={handleCopy} color={copied ? "success" : "primary"} size="small">
+                  {copied ? <CheckIcon fontSize="small" /> : <CopyIcon fontSize="small" />}
+                </IconButton>
+              </Tooltip>
+            </Box>
 
             {/* Status Pill */}
             <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 1, px: 2, py: 0.75, borderRadius: 5, bgcolor: '#FEF3C7', color: '#D97706', mt: 2, mb: 3 }}>
@@ -53,6 +71,26 @@ const Success = () => {
                 Pending Approval
               </Typography>
             </Box>
+
+            {/* Frontdesk Wait Info Alert/Message */}
+            <Paper
+              variant="outlined"
+              sx={{
+                p: 2.5,
+                mb: 3,
+                bgcolor: '#EFF6FF',
+                borderColor: '#BFDBFE',
+                borderRadius: 3,
+                textAlign: 'left'
+              }}
+            >
+              <Typography variant="body2" sx={{ color: '#1E40AF', fontWeight: 700, mb: 0.5 }}>
+                Please wait at the front desk
+              </Typography>
+              <Typography variant="caption" sx={{ color: '#1E40AF', display: 'block', lineHeight: 1.4 }}>
+                Your pass request has been submitted. Please wait at the front desk for your gate pass to be printed and issued.
+              </Typography>
+            </Paper>
 
             <Divider sx={{ my: 3 }} />
 
