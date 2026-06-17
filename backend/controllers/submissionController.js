@@ -95,6 +95,15 @@ const registerSubmission = async (req, res, next) => {
   }
 
   try {
+    // Check if duplicate active registration exists
+    const existingSubmission = await Submission.findOne({ phoneNumber, status: { $ne: 'archived' } });
+    if (existingSubmission) {
+      return res.status(409).json({
+        success: false,
+        message: `You have already registered. (Request ID: ${existingSubmission.requestId}). Please wait at the front desk for your pass.`
+      });
+    }
+
     const requestId = await generateUniqueRequestId();
 
     const submission = await Submission.create({

@@ -349,7 +349,7 @@ const Dashboard = () => {
   const handleDeleteSubmission = async (id) => {
     triggerConfirm(
       'Delete Submission',
-      'Are you sure you want to PERMANENTLY delete this submission? This action cannot be undone.',
+      'Are you sure you want to PERMANENTLY delete this submission? This will also remove the pass history. This action cannot be undone.',
       async () => {
         try {
           await api.delete(`/submissions/${id}`);
@@ -526,30 +526,45 @@ const Dashboard = () => {
 
   // Bulk reject handler
   const handleBulkReject = () => {
-    if (window.confirm(`Are you sure you want to reject ${selectedStudentIds.length} selected students?`)) {
-      bulkActionMutation.mutate({
-        studentIds: selectedStudentIds,
-        action: 'reject'
-      });
-    }
+    triggerConfirm(
+      'Reject Selected',
+      `Are you sure you want to reject ${selectedStudentIds.length} selected students?`,
+      () => {
+        bulkActionMutation.mutate({
+          studentIds: selectedStudentIds,
+          action: 'reject'
+        });
+      },
+      'warning'
+    );
   };
 
   const handleBulkArchive = () => {
-    if (window.confirm(`Are you sure you want to archive submissions for the ${selectedStudentIds.length} selected students?`)) {
-      bulkActionMutation.mutate({
-        studentIds: selectedStudentIds,
-        action: 'archive'
-      });
-    }
+    triggerConfirm(
+      'Archive Selected',
+      `Are you sure you want to archive submissions for the ${selectedStudentIds.length} selected students?`,
+      () => {
+        bulkActionMutation.mutate({
+          studentIds: selectedStudentIds,
+          action: 'archive'
+        });
+      },
+      'warning'
+    );
   };
 
   const handleBulkDelete = () => {
-    if (window.confirm(`Are you sure you want to PERMANENTLY delete submissions for the ${selectedStudentIds.length} selected students? This action cannot be undone.`)) {
-      bulkActionMutation.mutate({
-        studentIds: selectedStudentIds,
-        action: 'delete'
-      });
-    }
+    triggerConfirm(
+      'Delete Selected',
+      `Are you sure you want to PERMANENTLY delete submissions for the ${selectedStudentIds.length} selected students? This will also remove their pass history. This action cannot be undone.`,
+      () => {
+        bulkActionMutation.mutate({
+          studentIds: selectedStudentIds,
+          action: 'delete'
+        });
+      },
+      'error'
+    );
   };
 
   // CSV Data Exporter

@@ -168,7 +168,7 @@ const History = () => {
   const handleDeleteSubmission = async (id) => {
     triggerConfirm(
       'Delete Submission',
-      'Are you sure you want to PERMANENTLY delete this submission? This action cannot be undone.',
+      'Are you sure you want to PERMANENTLY delete this submission? This will also remove the pass history. This action cannot be undone.',
       async () => {
         try {
           await api.delete(`/submissions/${id}`);
