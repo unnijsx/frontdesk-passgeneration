@@ -1,5 +1,6 @@
 const Submission = require('../models/Submission');
 const AuditLog = require('../models/AuditLog');
+const Counter = require('../models/Counter');
 const { uploadStream, cloudinary } = require('../config/cloudinary');
 const fs = require('fs');
 const path = require('path');
@@ -9,23 +10,24 @@ const path = require('path');
  * Format: SC-XXXX (4+ digit sequential number starting at 1001)
  */
 const generateUniqueRequestId = async () => {
-  let isUnique = false;
-  let requestId = '';
-  let count = await Submission.countDocuments();
-
-  while (!isUnique) {
-    const nextNum = 1001 + count;
-    requestId = `SC-${nextNum}`;
-    
-    // Check DB just in case of race conditions
-    const exists = await Submission.findOne({ requestId });
-    if (!exists) {
-      isUnique = true;
-    } else {
-      count++;
-    }
+  // Check if counter document already exists
+  const exists = await Counter.findOne({ id: 'requestId' });
+  if (!exists) {
+    // Seed it based on current count in Submission collection
+    const count = await Submission.countDocuments();
+    await Counter.findOneAndUpdate(
+      { id: 'requestId' },
+      { $setOnInsert: { seq: 1000 + count } },
+      { upsert: true, new: true }
+    );
   }
-  return requestId;
+
+  const counter = await Counter.findOneAndUpdate(
+    { id: 'requestId' },
+    { $inc: { seq: 1 } },
+    { new: true }
+  );
+  return `SC-${counter.seq}`;
 };
 
 /**

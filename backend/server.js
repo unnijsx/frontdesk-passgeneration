@@ -72,13 +72,15 @@ app.use(
 app.use(mongoSanitize());
 app.use(xss());
 
-// Rate limiting (max 100 requests per 15 minutes per IP for general API)
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 mins
-  max: 200,
-  message: { success: false, message: 'Too many requests from this IP, please try again after 15 minutes' }
-});
-app.use('/api/', limiter);
+// Rate limiting (max 200 requests per 15 minutes per IP for general API)
+if (process.env.DISABLE_RATE_LIMIT !== 'true') {
+  const limiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 mins
+    max: 200,
+    message: { success: false, message: 'Too many requests from this IP, please try again after 15 minutes' }
+  });
+  app.use('/api/', limiter);
+}
 
 // Enable CORS
 app.use(
