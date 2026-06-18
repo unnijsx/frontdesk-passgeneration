@@ -15,7 +15,6 @@ import {
 import {
   CheckCircle as SuccessIcon,
   HourglassEmpty as PendingIcon,
-  QrCode2 as QrIcon,
   ArrowBack as BackIcon,
   ContentCopy as CopyIcon,
   Check as CheckIcon
@@ -31,8 +30,7 @@ const Success = () => {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  // Create QR Code URL using public QR Server API
-  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${requestId || 'SC-UNKNOWN'}&color=0f172a`;
+
 
   return (
     <Box sx={{ minHeight: '100vh', display: 'flex', alignItems: 'center', bgcolor: '#F8FAFC', py: 4 }}>
@@ -76,26 +74,6 @@ const Success = () => {
             <Typography variant="body2" color="textSecondary" sx={{ mb: 3, fontWeight: 500, px: 1, lineHeight: 1.5 }}>
               Your pass request has been submitted. Please wait at the front desk for your gate pass to be printed and issued. Please inform the front desk after registering.
             </Typography>
-
-            <Paper
-              elevation={0}
-              variant="outlined"
-              sx={{
-                p: 2,
-                display: 'inline-flex',
-                bgcolor: '#FFFFFF',
-                borderRadius: 3,
-                border: '1px solid #E2E8F0',
-                mb: 3
-              }}
-            >
-              <Box
-                component="img"
-                src={qrUrl}
-                alt="Gate Pass Request QR Code"
-                sx={{ width: 160, height: 160, display: 'block' }}
-              />
-            </Paper>
 
             <Divider sx={{ mb: 3 }} />
 
